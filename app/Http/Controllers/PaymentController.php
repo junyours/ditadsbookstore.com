@@ -94,7 +94,7 @@ class PaymentController extends Controller
 
     public function success()
     {
-        return Inertia::render('store/my-order');
+        return Inertia::render('store/payment/success');
     }
 
     public function cancel(Request $request)
@@ -114,7 +114,7 @@ class PaymentController extends Controller
             }
         }
 
-        return Inertia::render('store/my-order');
+        return Inertia::render('store/payment/cancel');
     }
 
     private function generateUniqueOrderNumber()

@@ -11,40 +11,64 @@ class PayMongoWebhookController extends Controller
     public function handle(Request $request)
     {
         $payload = $request->getContent();
-        $signature = $request->header('Paymongo-Signature');
+        $signatureHeader = $request->header('Paymongo-Signature');
         $secret = config('services.paymongo.webhook_secret');
 
-        if (!$this->isValidSignature($payload, $signature, $secret)) {
-            return response()->json(['message' => 'Error Paymongo Signature'], 400);
+        // Log everything for debugging
+        Log::info('PayMongo Webhook Received', [
+            'headers' => $request->headers->all(),
+            'body' => $request->all(),
+        ]);
+
+        if (!$this->isValidSignature($payload, $signatureHeader, $secret)) {
+            Log::error('Invalid PayMongo Signature');
+
+            return response()->json([
+                'message' => 'Invalid PayMongo signature'
+            ], 400);
         }
 
-        $event = $request->input('data.attributes.type');
+        $event = data_get($request->all(), 'data.attributes.type');
 
         match ($event) {
             'payment.paid' => $this->paymentPaid($request),
             'payment.failed' => $this->paymentFailed($request),
-            default => null,
+            default => Log::warning('Unhandled PayMongo event', ['event' => $event]),
         };
 
-        return response()->json(['message' => 'Success Paymongo Signature'], 200);
+        return response()->json(['message' => 'Webhook processed']);
     }
 
-    private function isValidSignature($payload, $signature, $secret)
+    private function isValidSignature($payload, $signatureHeader, $secret)
     {
+        if (!$signatureHeader)
+            return false;
+
+        // PayMongo format: t=timestamp,v1=hash
+        parse_str(str_replace(',', '&', $signatureHeader), $parts);
+
+        if (!isset($parts['v1']))
+            return false;
+
         $expected = hash_hmac('sha256', $payload, $secret);
-        return hash_equals($expected, $signature);
+
+        return hash_equals($expected, $parts['v1']);
     }
 
     private function paymentPaid(Request $request)
     {
-        $paymentId = $request->input('data.id');
-        $checkoutSessionId = $request->input('data.attributes.source.id');
-        $paymentMethodType = $request->input('data.attributes.payment_method_type');
+        $paymentId = data_get($request->all(), 'data.id');
+        $checkoutSessionId = data_get($request->all(), 'data.attributes.source.id');
+        $paymentMethodType = data_get($request->all(), 'data.attributes.payment_method_type');
 
-        $orderPayment = OrderPayment::where(
-            'checkout_session_id',
-            $checkoutSessionId
-        )->first();
+        $orderPayment = OrderPayment::where('checkout_session_id', $checkoutSessionId)->first();
+
+        if (!$orderPayment) {
+            Log::error('OrderPayment not found', [
+                'checkout_session_id' => $checkoutSessionId
+            ]);
+            return;
+        }
 
         $orderPayment->update([
             'payment_reference' => $paymentId,
@@ -55,15 +79,23 @@ class PayMongoWebhookController extends Controller
         $orderPayment->order()->update([
             'status' => 'preparing',
         ]);
+
+        Log::info('Payment marked as PAID', [
+            'checkout_session_id' => $checkoutSessionId
+        ]);
     }
 
     private function paymentFailed(Request $request)
     {
-        $checkoutSessionId = $request->input('data.attributes.source.id');
+        $checkoutSessionId = data_get($request->all(), 'data.attributes.source.id');
 
         OrderPayment::where('checkout_session_id', $checkoutSessionId)
             ->update([
                 'status' => 'failed',
             ]);
+
+        Log::info('Payment marked as FAILED', [
+            'checkout_session_id' => $checkoutSessionId
+        ]);
     }
 }
