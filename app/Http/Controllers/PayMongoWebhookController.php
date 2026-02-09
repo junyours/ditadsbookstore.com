@@ -41,16 +41,18 @@ class PayMongoWebhookController extends Controller
 
     private function isValidSignature($payload, $signatureHeader, $secret)
     {
-        if (!$signatureHeader)
+        if (!$signatureHeader || !$secret)
             return false;
 
-        // PayMongo format: t=timestamp,v1=hash
+        // Convert: t=123,v1=abc → array
         parse_str(str_replace(',', '&', $signatureHeader), $parts);
 
-        if (!isset($parts['v1']))
+        if (!isset($parts['t']) || !isset($parts['v1']))
             return false;
 
-        $expected = hash_hmac('sha256', $payload, $secret);
+        $signedPayload = $parts['t'] . '.' . $payload;
+
+        $expected = hash_hmac('sha256', $signedPayload, $secret);
 
         return hash_equals($expected, $parts['v1']);
     }
