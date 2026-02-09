@@ -11,66 +11,40 @@ class PayMongoWebhookController extends Controller
     public function handle(Request $request)
     {
         $payload = $request->getContent();
-        $signatureHeader = $request->header('Paymongo-Signature');
+        $signature = $request->header('Paymongo-Signature');
         $secret = config('services.paymongo.webhook_secret');
 
-        // Log everything for debugging
-        Log::info('PayMongo Webhook Received', [
-            'headers' => $request->headers->all(),
-            'body' => $request->all(),
-        ]);
-
-        if (!$this->isValidSignature($payload, $signatureHeader, $secret)) {
-            Log::error('Invalid PayMongo Signature');
-
-            return response()->json([
-                'message' => 'Invalid PayMongo signature'
-            ], 400);
+        if (!$this->isValidSignature($payload, $signature, $secret)) {
+            return response()->json(['message' => 'Error Paymongo Signature'], 400);
         }
 
-        $event = data_get($request->all(), 'data.attributes.type');
+        $event = $request->input('data.attributes.type');
 
         match ($event) {
             'payment.paid' => $this->paymentPaid($request),
             'payment.failed' => $this->paymentFailed($request),
-            default => Log::warning('Unhandled PayMongo event', ['event' => $event]),
+            default => null,
         };
 
-        return response()->json(['message' => 'Webhook processed']);
+        return response()->json(['message' => 'Success Paymongo Signature'], 200);
     }
 
-    private function isValidSignature($payload, $signatureHeader, $secret)
+    private function isValidSignature($payload, $signature, $secret)
     {
-        if (!$signatureHeader || !$secret)
-            return false;
-
-        // Convert: t=123,v1=abc → array
-        parse_str(str_replace(',', '&', $signatureHeader), $parts);
-
-        if (!isset($parts['t']) || !isset($parts['v1']))
-            return false;
-
-        $signedPayload = $parts['t'] . '.' . $payload;
-
-        $expected = hash_hmac('sha256', $signedPayload, $secret);
-
-        return hash_equals($expected, $parts['v1']);
+        $expected = hash_hmac('sha256', $payload, $secret);
+        return hash_equals($expected, $signature);
     }
 
     private function paymentPaid(Request $request)
     {
-        $paymentId = data_get($request->all(), 'data.id');
-        $checkoutSessionId = data_get($request->all(), 'data.attributes.source.id');
-        $paymentMethodType = data_get($request->all(), 'data.attributes.payment_method_type');
+        $paymentId = $request->input('data.id');
+        $checkoutSessionId = $request->input('data.attributes.source.id');
+        $paymentMethodType = $request->input('data.attributes.payment_method_type');
 
-        $orderPayment = OrderPayment::where('checkout_session_id', $checkoutSessionId)->first();
-
-        if (!$orderPayment) {
-            Log::error('OrderPayment not found', [
-                'checkout_session_id' => $checkoutSessionId
-            ]);
-            return;
-        }
+        $orderPayment = OrderPayment::where(
+            'checkout_session_id',
+            $checkoutSessionId
+        )->first();
 
         $orderPayment->update([
             'payment_reference' => $paymentId,
@@ -81,23 +55,15 @@ class PayMongoWebhookController extends Controller
         $orderPayment->order()->update([
             'status' => 'preparing',
         ]);
-
-        Log::info('Payment marked as PAID', [
-            'checkout_session_id' => $checkoutSessionId
-        ]);
     }
 
     private function paymentFailed(Request $request)
     {
-        $checkoutSessionId = data_get($request->all(), 'data.attributes.source.id');
+        $checkoutSessionId = $request->input('data.attributes.source.id');
 
         OrderPayment::where('checkout_session_id', $checkoutSessionId)
             ->update([
                 'status' => 'failed',
             ]);
-
-        Log::info('Payment marked as FAILED', [
-            'checkout_session_id' => $checkoutSessionId
-        ]);
     }
 }
