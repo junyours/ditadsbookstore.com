@@ -2,7 +2,7 @@ import AppLayout from "@/layouts/app-layout";
 import { Fragment, ReactPortal, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageProps } from "@/types";
-import { usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import {
     CircleCheck,
     CircleX,
@@ -51,7 +51,6 @@ import {
     Dialog,
     DialogClose,
     DialogContent,
-    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -119,12 +118,51 @@ export default function Order() {
             currency: "PHP",
         }).format(amount);
     const [tabs, setTabs] = useState("preparing");
+    const [courier, setCourier] = useState({
+        tracking_number: "",
+        name: "",
+    });
+    const [loading, setLoading] = useState(false);
 
     const orderStatus = (status: string) => {
         return orders.filter((o) => o.status === status).length;
     };
 
     const order = orders.find((order) => order.status === tabs);
+
+    const handleMoveShipping = (order_id: number) => {
+        setLoading(true);
+        router.post(
+            "/admin/orders/change-status",
+            {
+                order_id,
+                status: "shipping",
+                tracking_number: courier.tracking_number,
+                name: courier.name,
+            },
+            {
+                onFinish: () => {
+                    setLoading(false);
+                },
+            },
+        );
+    };
+
+    const handleMoveDelivered = (order_id: number) => {
+        setLoading(true);
+        router.post(
+            "/admin/orders/change-status",
+            {
+                order_id,
+                status: "delivered",
+            },
+            {
+                onFinish: () => {
+                    setLoading(false);
+                },
+            },
+        );
+    };
 
     return (
         <div className="space-y-4">
@@ -189,30 +227,28 @@ export default function Order() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {order &&
-                                (() => {
-                                    const orderTotalItem =
-                                        order.order_book.reduce(
-                                            (sum, item) =>
-                                                sum + Number(item.quantity),
-                                            0,
-                                        );
-                                    const orderTotalAmount =
-                                        order.order_book.reduce(
-                                            (sum, item) =>
-                                                sum +
-                                                Number(item.price) *
-                                                    Number(item.quantity),
-                                            0,
-                                        );
-                                    const hiddenItemsCount = order.order_book
-                                        .slice(1)
-                                        .reduce(
-                                            (sum, item) =>
-                                                sum + Number(item.quantity),
-                                            0,
-                                        );
-                                    return (
+                            {orders.map((order) => {
+                                const orderTotalItem = order.order_book.reduce(
+                                    (sum, item) => sum + Number(item.quantity),
+                                    0,
+                                );
+                                const orderTotalAmount =
+                                    order.order_book.reduce(
+                                        (sum, item) =>
+                                            sum +
+                                            Number(item.price) *
+                                                Number(item.quantity),
+                                        0,
+                                    );
+                                const hiddenItemsCount = order.order_book
+                                    .slice(1)
+                                    .reduce(
+                                        (sum, item) =>
+                                            sum + Number(item.quantity),
+                                        0,
+                                    );
+                                return (
+                                    order.status === tabs && (
                                         <Fragment key={order.id}>
                                             <TableRow>
                                                 <TableCell className="whitespace-nowrap">
@@ -644,14 +680,51 @@ export default function Order() {
                                                                                                 Tracking
                                                                                                 Number
                                                                                             </Label>
-                                                                                            <Input />
+                                                                                            <Input
+                                                                                                value={
+                                                                                                    courier.tracking_number
+                                                                                                }
+                                                                                                onChange={(
+                                                                                                    e,
+                                                                                                ) =>
+                                                                                                    setCourier(
+                                                                                                        (
+                                                                                                            prev,
+                                                                                                        ) => ({
+                                                                                                            ...prev,
+                                                                                                            tracking_number:
+                                                                                                                e
+                                                                                                                    .target
+                                                                                                                    .value,
+                                                                                                        }),
+                                                                                                    )
+                                                                                                }
+                                                                                            />
                                                                                             <InputError message="" />
                                                                                         </div>
                                                                                         <div className="grid w-full items-center gap-2">
                                                                                             <Label>
                                                                                                 Name
                                                                                             </Label>
-                                                                                            <Input />
+                                                                                            <Input
+                                                                                                value={
+                                                                                                    courier.name
+                                                                                                }
+                                                                                                onChange={(
+                                                                                                    e,
+                                                                                                ) =>
+                                                                                                    setCourier(
+                                                                                                        (
+                                                                                                            prev,
+                                                                                                        ) => ({
+                                                                                                            ...prev,
+                                                                                                            name: e
+                                                                                                                .target
+                                                                                                                .value,
+                                                                                                        }),
+                                                                                                    )
+                                                                                                }
+                                                                                            />
                                                                                             <InputError message="" />
                                                                                         </div>
                                                                                     </div>
@@ -661,12 +734,38 @@ export default function Order() {
                                                                                                 Cancel
                                                                                             </Button>
                                                                                         </DialogClose>
-                                                                                        <Button>
+                                                                                        <Button
+                                                                                            onClick={() =>
+                                                                                                handleMoveShipping(
+                                                                                                    order.id,
+                                                                                                )
+                                                                                            }
+                                                                                            disabled={
+                                                                                                loading
+                                                                                            }
+                                                                                        >
                                                                                             Save
                                                                                         </Button>
                                                                                     </DialogFooter>
                                                                                 </DialogContent>
                                                                             </Dialog>
+                                                                        )}
+                                                                        {order.status ===
+                                                                            "shipping" && (
+                                                                            <Button
+                                                                                onClick={() =>
+                                                                                    handleMoveDelivered(
+                                                                                        order.id,
+                                                                                    )
+                                                                                }
+                                                                                disabled={
+                                                                                    loading
+                                                                                }
+                                                                            >
+                                                                                Move
+                                                                                to
+                                                                                Delivered
+                                                                            </Button>
                                                                         )}
                                                                     </SheetFooter>
                                                                 </SheetContent>
@@ -753,8 +852,9 @@ export default function Order() {
                                                 </TableRow>
                                             )}
                                         </Fragment>
-                                    );
-                                })()}
+                                    )
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </TabsContent>

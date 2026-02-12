@@ -41,6 +41,7 @@ Route::middleware(['role:admin'])->group(function () {
   Route::post('/admin/books/delete', [BookController::class, 'deleteBook']);
 
   Route::get('/admin/orders', [OrderController::class, 'order']);
+  Route::post('/admin/orders/change-status', [OrderController::class, 'orderChangeStatus']);
 
   Route::get('/admin/authors', [AuthorController::class, 'author']);
   Route::post('/admin/authors/add', [AuthorController::class, 'addAuthor']);
