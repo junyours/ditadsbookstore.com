@@ -46,6 +46,9 @@ class PaymentController extends Controller
                     ],
                     'success_url' => route('payment.success'),
                     'cancel_url' => route('payment.cancel', ['order_id' => $order->id]),
+                    'metadata' => [
+                        'order_id' => $order->id,
+                    ],
                 ],
             ],
         ]);

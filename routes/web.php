@@ -21,18 +21,16 @@ Route::middleware(['role:customer'])->group(function () {
 
   Route::get('/checkout', [CustomerController::class, 'checkout'])->name('checkout');
 
+  Route::post('/pay/checkout', [PaymentController::class, 'checkout'])
+    ->name('payment.checkout');
+  Route::get('/payment/success', [PaymentController::class, 'success'])
+    ->name('payment.success');
+  Route::get('/payment/cancel', [PaymentController::class, 'cancel'])
+    ->name('payment.cancel');
+
   Route::get('/my-profile', [CustomerController::class, 'myProfile'])->name('my-profile');
   Route::get('/my-orders', [CustomerController::class, 'myOrder'])->name('my-order');
 });
-
-Route::post('/pay/checkout', [PaymentController::class, 'checkout'])
-  ->name('payment.checkout');
-
-Route::get('/payment/success', [PaymentController::class, 'success'])
-  ->name('payment.success');
-
-Route::get('/payment/cancel', [PaymentController::class, 'cancel'])
-  ->name('payment.cancel');
 
 Route::middleware(['role:admin'])->group(function () {
   Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');

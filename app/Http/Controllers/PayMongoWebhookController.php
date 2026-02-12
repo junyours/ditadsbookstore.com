@@ -4,96 +4,73 @@ namespace App\Http\Controllers;
 
 use App\Models\OrderPayment;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class PayMongoWebhookController extends Controller
 {
     public function handle(Request $request)
     {
-        // Respond immediately (PayMongo requirement)
-        response()->json(['received' => true], 200)->send();
-
-        try {
-            $payload = $request->getContent();
-            $signature = $request->header('Paymongo-Signature');
-
-            // Only verify signature in production
-            // if (app()->environment('production')) {
-            //     if (!$this->isValidSignature($payload, $signature)) {
-            //         Log::warning('Invalid PayMongo Signature');
-            //         return;
-            //     }
-            // }
-
-            if (!$this->isValidSignature($payload, $signature)) {
-                Log::warning('Invalid PayMongo Signature');
-                return;
-            }
-
-            Log::info('PayMongo Webhook', $request->all());
-
-            $event = data_get($request, 'data.attributes.type');
-
-            match ($event) {
-                'payment.paid' => $this->paymentPaid($request),
-                'payment.failed' => $this->paymentFailed($request),
-                default => Log::info('Unhandled event', [$event]),
-            };
-
-        } catch (\Throwable $e) {
-
-            Log::error('PayMongo Webhook Exception', [
-                'message' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    private function isValidSignature($payload, $signatureHeader)
-    {
         $secret = config('services.paymongo.webhook_secret');
 
-        if (!$signatureHeader)
-            return false;
+        $payload = $request->getContent();
+        $event = json_decode($payload, true);
 
-        parse_str(str_replace(',', '&', $signatureHeader), $parts);
+        $signature = $request->header('Paymongo-Signature');
 
-        if (!isset($parts['v1']))
-            return false;
+        $parts = explode(',', $signature);
+        $timestamp = explode('=', $parts[0])[1];
+        $sig = explode('=', $parts[1])[1];
 
-        $expected = hash_hmac('sha256', $payload, $secret);
+        $signedPayload = $timestamp . '.' . $payload;
+        $computed = hash_hmac('sha256', $signedPayload, $secret);
 
-        return hash_equals($expected, $parts['v1']);
-    }
-
-    private function paymentPaid(Request $request)
-    {
-        $checkoutSessionId = data_get($request, 'data.attributes.source.id');
-
-        $orderPayment = OrderPayment::where('checkout_session_id', $checkoutSessionId)->first();
-
-        if (!$orderPayment) {
-            Log::warning('OrderPayment not found', [$checkoutSessionId]);
-            return;
+        if (!hash_equals($computed, $sig)) {
+            return response()->json(['error' => 'Invalid signature'], 400);
         }
 
-        $orderPayment->update([
-            'payment_reference' => data_get($request, 'data.id'),
-            'payment_method' => data_get($request, 'data.attributes.payment_method_type'),
+        $type = data_get($event, 'data.attributes.type');
+
+        match ($type) {
+            'payment.paid' => $this->paymentPaid($event),
+            'payment.failed' => $this->paymentFailed($event),
+            default => null,
+        };
+
+        return response()->json(['status' => 'ok'], 200);
+    }
+
+    private function paymentPaid($event)
+    {
+        $orderId = data_get($event, 'data.attributes.data.attributes.metadata.order_id');
+
+        $payment = OrderPayment::where('order_id', $orderId)->first();
+
+        if (!$payment) {
+            return response()->json(['error' => 'Payment not found'], 404);
+        }
+
+        $payment->update([
+            'payment_reference' => data_get($event, 'data.attributes.data.id'),
+            'payment_method' => data_get($event, 'data.attributes.data.attributes.source.type'),
             'status' => 'paid',
         ]);
 
-        $orderPayment->order()->update([
-            'status' => 'preparing',
+        $payment->order()->update([
+            'status' => 'preparing'
         ]);
     }
 
-    private function paymentFailed(Request $request)
+    private function paymentFailed($event)
     {
-        OrderPayment::where(
-            'checkout_session_id',
-            data_get($request, 'data.attributes.source.id')
-        )->update([
-                    'status' => 'failed',
-                ]);
+        $orderId = data_get($event, 'data.attributes.data.attributes.metadata.order_id');
+
+        $payment = OrderPayment::where('order_id', $orderId)->first();
+
+        if (!$payment) {
+            return response()->json(['error' => 'Payment not found'], 404);
+        }
+
+        $payment->update([
+            'status' => 'failed'
+        ]);
     }
 }
