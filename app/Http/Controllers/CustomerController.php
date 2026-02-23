@@ -94,6 +94,7 @@ class CustomerController extends Controller
 
         $orders = Order::where('user_id', $user_id)
             ->with(['user', 'orderBook.book', 'orderPayment', 'orderShippingAddress', 'orderCourier'])
+            ->latest()
             ->get();
 
         return Inertia::render('store/my-order', [

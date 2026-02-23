@@ -16,11 +16,11 @@ class PaymentController extends Controller
 {
     public function checkout(Request $request, PayMongoRequest $paymongo)
     {
-        $user_id = $request->user()->id;
+        $user = $request->user();
         $items = $request->items;
 
         $order = Order::create([
-            'user_id' => $user_id,
+            'user_id' => $user->id,
             'order_number' => $this->generateUniqueOrderNumber(),
             'status' => 'to_pay',
         ]);
@@ -31,6 +31,9 @@ class PaymentController extends Controller
                 'quantity' => $item['quantity'],
                 'amount' => (int) ((float) $item['book']['price'] * 100),
                 'currency' => 'PHP',
+                'images' => [
+                    "https://lh3.googleusercontent.com/d/" . $item['book']['image']
+                ],
             ];
         })->values()->toArray();
 
@@ -88,7 +91,7 @@ class PaymentController extends Controller
             'phone_number' => $request->input('data.phone_number'),
         ]);
 
-        Cart::where('user_id', $user_id)->delete();
+        Cart::where('user_id', $user->id)->delete();
 
         return response()->json([
             'checkout_url' => $response['data']['attributes']['checkout_url'],

@@ -12,6 +12,7 @@ class OrderController extends Controller
     public function order()
     {
         $orders = Order::with(['user', 'orderBook.book', 'orderPayment', 'orderShippingAddress', 'orderCourier'])
+            ->latest()
             ->get();
 
         return Inertia::render('app/order', [

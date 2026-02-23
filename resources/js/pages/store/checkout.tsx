@@ -127,22 +127,36 @@ export default function Checkout() {
     }, 0);
 
     const fetchRegions = async () => {
-        const { data } = await axios.get("https://psgc.cloud/api/v2/regions");
-        setRegions(data.data);
+        try {
+            const { data } = await axios.get(
+                "https://psgc.cloud/api/v2/regions",
+            );
+            setRegions(data.data);
+        } catch (error) {
+            console.log(error);
+        }
     };
 
     const fetchProvinces = async (regionCode: string) => {
-        const { data } = await axios.get(
-            `https://psgc.cloud/api/v2/regions/${regionCode}/provinces`,
-        );
-        setProvinces(data.data);
+        try {
+            const { data } = await axios.get(
+                `https://psgc.cloud/api/v2/regions/${regionCode}/provinces`,
+            );
+            setProvinces(data.data);
+        } catch (error) {
+            console.log(error);
+        }
     };
 
     const fetchCities = async (regionCode: string, provinceCode: string) => {
-        const { data } = await axios.get(
-            `https://psgc.cloud/api/v2/regions/${regionCode}/provinces/${provinceCode}/cities-municipalities`,
-        );
-        setCities(data.data);
+        try {
+            const { data } = await axios.get(
+                `https://psgc.cloud/api/v2/regions/${regionCode}/provinces/${provinceCode}/cities-municipalities`,
+            );
+            setCities(data.data);
+        } catch (error) {
+            console.log(error);
+        }
     };
 
     const fetchBarangays = async (
@@ -150,10 +164,14 @@ export default function Checkout() {
         provinceCode: string,
         cityCode: string,
     ) => {
-        const { data } = await axios.get(
-            `https://psgc.cloud/api/v2/regions/${regionCode}/provinces/${provinceCode}/cities-municipalities/${cityCode}/barangays`,
-        );
-        setBarangays(data.data);
+        try {
+            const { data } = await axios.get(
+                `https://psgc.cloud/api/v2/regions/${regionCode}/provinces/${provinceCode}/cities-municipalities/${cityCode}/barangays`,
+            );
+            setBarangays(data.data);
+        } catch (error) {
+            console.log(error);
+        }
     };
 
     useEffect(() => {

@@ -38,7 +38,7 @@ class AuthorController extends Controller
         User::create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'password' => Hash::make(Str::random(8)),
+            'password' => Hash::make('P@ssw0rd'),
             'role' => 'author',
         ]);
     }
