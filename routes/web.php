@@ -30,6 +30,9 @@ Route::middleware(['role:customer'])->group(function () {
 
   Route::get('/my-profile', [CustomerController::class, 'myProfile'])->name('my-profile');
   Route::get('/my-orders', [CustomerController::class, 'myOrder'])->name('my-order');
+  Route::post('/pay/repay', [PaymentController::class, 'repay'])
+    ->name('payment.repay');
+  Route::post('/my-orders/cancel', [CustomerController::class, 'cancelOrder'])->name('my-order.cancel');
 });
 
 Route::middleware(['role:admin'])->group(function () {

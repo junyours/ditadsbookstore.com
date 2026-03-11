@@ -48,22 +48,13 @@ class PaymentController extends Controller
                         // 'paymaya',
                     ],
                     'success_url' => route('payment.success'),
-                    'cancel_url' => route('payment.cancel', ['order_id' => $order->id]),
+                    'cancel_url' => route('payment.cancel'),
                     'metadata' => [
                         'order_id' => $order->id,
                     ],
                 ],
             ],
         ]);
-
-        $checkoutData = $response['data'] ?? null;
-
-        if (!$checkoutData) {
-            return response()->json([
-                'error' => 'Unable to create checkout session',
-                'response' => $response,
-            ], 500);
-        }
 
         foreach ($items as $item) {
             OrderBook::create([
@@ -76,7 +67,6 @@ class PaymentController extends Controller
 
         OrderPayment::create([
             'order_id' => $order->id,
-            'checkout_session_id' => $response['data']['id'],
             'status' => 'pending',
         ]);
 
@@ -98,28 +88,57 @@ class PaymentController extends Controller
         ]);
     }
 
+    public function repay(Request $request, PayMongoRequest $paymongo)
+    {
+        $order = Order::findOrFail($request->input('order_id'));
+
+        $items = OrderBook::where('order_id', $order->id)
+            ->with(['book'])
+            ->get();
+
+        $lineItems = collect($items)->map(function ($item) {
+            return [
+                'name' => $item->book->title,
+                'quantity' => (int) $item->quantity,
+                'amount' => (int) ((float) $item->book->price * 100),
+                'currency' => 'PHP',
+                'images' => [
+                    "https://lh3.googleusercontent.com/d/" . $item->book->image
+                ],
+            ];
+        })->values()->toArray();
+
+        $response = $paymongo->createCheckout([
+            'data' => [
+                'attributes' => [
+                    'line_items' => $lineItems,
+                    'payment_method_types' => [
+                        'qrph',
+                        // 'card',
+                        // 'gcash',
+                        // 'paymaya',
+                    ],
+                    'success_url' => route('payment.success'),
+                    'cancel_url' => route('payment.cancel'),
+                    'metadata' => [
+                        'order_id' => $order->id,
+                    ],
+                ],
+            ],
+        ]);
+
+        return response()->json([
+            'checkout_url' => $response['data']['attributes']['checkout_url'],
+        ]);
+    }
+
     public function success()
     {
         return Inertia::render('store/payment/success');
     }
 
-    public function cancel(Request $request)
+    public function cancel()
     {
-        $orderId = $request->query('order_id');
-
-        if ($orderId) {
-            $order = Order::find($orderId);
-            if ($order && $order->status === 'to_pay') {
-                $order->update([
-                    'status' => 'cancelled',
-                ]);
-
-                $order->orderPayment()->update([
-                    'status' => 'failed',
-                ]);
-            }
-        }
-
         return Inertia::render('store/payment/cancel');
     }
 

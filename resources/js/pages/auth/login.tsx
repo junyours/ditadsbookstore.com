@@ -3,9 +3,8 @@ import StoreLayout from "@/layouts/store-layout";
 import { ReactPortal } from "react";
 import Facebook from "../../../../public/images/icons/facebook.png";
 import Google from "../../../../public/images/icons/google.png";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Loader2 } from "lucide-react";
-import { useForm, usePage } from "@inertiajs/react";
+import { Loader2 } from "lucide-react";
+import { useForm } from "@inertiajs/react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import InputError from "@/components/input-error";
@@ -21,17 +20,9 @@ export default function Login() {
         clearErrors();
         post(route("login"));
     };
-    const { flash } = usePage().props;
 
     return (
         <div className="max-w-xs mx-auto flex flex-col justify-center gap-8">
-            {flash.error && (
-                <Alert variant="destructive">
-                    <AlertCircle className="size-5" strokeWidth={1.5} />
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>{flash.error}</AlertDescription>
-                </Alert>
-            )}
             <h1 className="font-bold text-2xl text-center uppercase">
                 Sign in to your account
             </h1>
@@ -62,13 +53,13 @@ export default function Login() {
                         {processing ? "Logging in" : "Log in"}
                     </Button>
                 </form>
-                <p className="font-semibold text-center text-sm">
-                    Or
-                </p>
+                <p className="font-semibold text-center text-sm">Or</p>
                 <a href={route("social.redirect", "google")}>
                     <Button variant="secondary" className="w-full">
                         <img src={Google} alt="google" className="size-5" />
-                        <span className="font-semibold">Sign in with Google</span>
+                        <span className="font-semibold">
+                            Sign in with Google
+                        </span>
                     </Button>
                 </a>
                 {/* <div className="grid grid-cols-2 gap-4">

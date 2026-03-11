@@ -102,6 +102,15 @@ class CustomerController extends Controller
         ]);
     }
 
+    public function cancelOrder(Request $request)
+    {
+        $order = Order::find($request->input('order_id'));
+
+        $order->update([
+            'status' => 'cancelled'
+        ]);
+    }
+
     public function myProfile()
     {
         return Inertia::render('store/my-profile');

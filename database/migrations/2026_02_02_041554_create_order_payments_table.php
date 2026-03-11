@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('order_payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('order_id')->constrained('orders');
-            $table->string('checkout_session_id');
             $table->string('payment_reference')->nullable();
             $table->string('payment_method')->nullable();
             $table->string('status');
